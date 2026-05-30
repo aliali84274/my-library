@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مكتبتي">
+<meta name="description" content="مكتبة الروايات الشخصية">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>مكتبتي 📚</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f1a;
+    --bg2: #1a1a2e;
+    --bg3: #16213e;
+    --card: #1e1e35;
+    --border: #2a2a4a;
+    --accent: #7c6af7;
+    --accent2: #a78bfa;
+    --text: #e8e8f0;
+    --muted: #8888aa;
+    --red: #f87171;
+    --green: #4ade80;
+    --gold: #fbbf24;
+    --radius: 14px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+  
+  /* TOP BAR */
+  .topbar { position: sticky; top: 0; z-index: 100; background: var(--bg2); border-bottom: 1px solid var(--border); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar-title { font-size: 17px; font-weight: 700; color: var(--accent2); }
+  .topbar-back { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
+  .topbar-back:active { background: var(--border); }
+  .icon-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 16px; cursor: pointer; padding: 6px 10px; border-radius: 10px; }
+
+  /* TABS */
+  .tabs { display: flex; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 11px 0; font-size: 12px; text-align: center; cursor: pointer; border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .tab .tab-icon { font-size: 18px; }
+  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* SCREENS */
+  .screen { display: none; min-height: calc(100vh - 110px); }
+  .screen.active { display: block; }
+
+  /* SEARCH */
+  .search-wrap { padding: 12px 16px; background: var(--bg2); }
+  .search-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; color: var(--text); outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* NOVEL CARDS */
+  .novels-grid { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .novel-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; gap: 12px; cursor: pointer; transition: all 0.2s; }
+  .novel-card:active { transform: scale(0.98); border-color: var(--accent); }
+  .novel-cover { width: 52px; height: 70px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; background: linear-gradient(135deg, var(--bg3), var(--border)); }
+  .novel-info { flex: 1; min-width: 0; }
+  .novel-name { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .novel-author { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .novel-stats { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+  .badge.accent { background: rgba(124,106,247,0.15); color: var(--accent2); border-color: rgba(124,106,247,0.3); }
+
+  /* FAB */
+  .fab { position: fixed; bottom: 24px; left: 20px; width: 54px; height: 54px; border-radius: 50%; background: var(--accent); color: white; border: none; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(124,106,247,0.5); z-index: 50; transition: transform 0.2s; }
+  .fab:active { transform: scale(0.92); }
+
+  /* NOVEL DETAIL */
+  .novel-header { padding: 16px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+  .novel-header-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .novel-header-sub { font-size: 13px; color: var(--muted); }
+  .novel-header-desc { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+  .action-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .action-btn { display: flex; align-items: center; gap: 5px; font-size: 12px; padding: 7px 13px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); cursor: pointer; transition: all 0.2s; }
+  .action-btn:active { background: var(--accent); border-color: var(--accent); }
+
+  /* CHAPTERS */
+  .chapter-item { display: flex; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--border); cursor: pointer; gap: 12px; transition: background 0.15s; }
+  .chapter-item:active { background: var(--bg3); }
+  .ch-num { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .ch-translated { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4); color: var(--green); }
+  .ch-info { flex: 1; min-width: 0; }
+  .ch-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .ch-files { display: flex; gap: 6px; margin-top: 5px; }
+  .file-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; }
+  .file-badge.pdf { background: rgba(248,113,113,0.15); color: #fca5a5; border: 1px solid rgba(248,113,113,0.3); }
+  .file-badge.word { background: rgba(96,165,250,0.15); color: #93c5fd; border: 1px solid rgba(96,165,250,0.3); }
+
+  /* READER */
+  .reader-body { padding: 20px 16px; }
+  .reader-text { font-size: 16px; line-height: 2; color: var(--text); }
+  .reader-controls { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .trans-box { margin-top: 24px; background: rgba(124,106,247,0.08); border: 1px solid rgba(124,106,247,0.25); border-radius: var(--radius); padding: 16px; }
+  .trans-label { font-size: 12px; color: var(--accent2); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .trans-text { font-size: 15px; line-height: 1.9; color: var(--text); }
+  .files-box { margin-top: 16px; background: var(--bg3); border-radius: var(--radius); padding: 14px; border: 1px solid var(--border); }
+  .files-box-title { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .file-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .file-item:last-child { border-bottom: none; }
+  .file-icon { font-size: 20px; }
+  .file-name { flex: 1; font-size: 13px; color: var(--text); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-dl { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; font-size: 11px; color: var(--accent2); cursor: pointer; }
+
+  /* MODALS */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; padding: 20px 16px 40px; max-height: 88vh; overflow-y: auto; border-top: 1px solid var(--border); }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 4px; margin: 0 auto 16px; }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+  .form-label { font-size: 12px; color: var(--muted); display: block; margin: 14px 0 5px; }
+  .form-input { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--text); outline: none; font-family: inherit; }
+  .form-input:focus { border-color: var(--accent); }
+  textarea.form-input { resize: vertical; min-height: 90px; line-height: 1.6; }
+  .btn-row { display: flex; gap: 8px; margin-top: 18px; }
+  .btn { padding: 12px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--bg3); color: var(--text); transition: all 0.2s; flex: 1; text-align: center; }
+  .btn:active { transform: scale(0.97); }
+  .btn-accent { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-accent:active { background: #6b5ce7; }
+
+  /* FILE UPLOAD */
+  .upload-zone { border: 2px dashed var(--border); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .upload-zone:active, .upload-zone.drag { border-color: var(--accent); background: rgba(124,106,247,0.08); }
+  .upload-zone-text { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .upload-preview { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .upload-file-item { display: flex; align-items: center; gap: 8px; background: var(--bg3); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--text); }
+  .upload-remove { margin-right: auto; background: none; border: none; color: var(--red); cursor: pointer; font-size: 16px; }
+
+  /* SETUP SCREEN */
+  .setup-screen { padding: 24px 20px; text-align: center; }
+  .setup-logo { font-size: 60px; margin-bottom: 16px; }
+  .setup-title { font-size: 22px; font-weight: 700; color: var(--accent2); margin-bottom: 8px; }
+  .setup-desc { font-size: 14px; color: var(--muted); line-height: 1.7; margin-bottom: 24px; }
+  .setup-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: right; margin-bottom: 12px; }
+  .setup-step { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .setup-step a { color: var(--accent2); }
+  .setup-step code { background: var(--bg3); padding: 2px 6px; border-radius: 5px; font-size: 12px; color: var(--gold); }
+
+  /* TRANSLATE SCREEN */
+  .trans-screen { padding: 16px; }
+  .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .export-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .export-card:active { border-color: var(--accent); background: rgba(124,106,247,0.1); }
+  .export-icon { font-size: 30px; margin-bottom: 8px; }
+  .export-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .export-desc { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* SYNC STATUS */
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .sync-dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .sync-dot.off { background: var(--red); }
+  .sync-dot.loading { background: var(--gold); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* LOADING */
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 11px 20px; border-radius: 20px; font-size: 13px; z-index: 999; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; box-shadow: var(--shadow); }
+  .toast.show { opacity: 1; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 48px 24px; }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 14px; color: var(--muted); line-height: 1.7; }
+
+  /* SHARE BANNER */
+  .share-banner { background: rgba(124,106,247,0.1); border: 1px solid rgba(124,106,247,0.3); border-radius: var(--radius); padding: 12px 14px; margin: 12px 16px; display: flex; align-items: center; gap: 10px; }
+  .share-banner-text { font-size: 12px; color: var(--accent2); flex: 1; line-height: 1.5; }
+  .share-copy-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+
+  /* INSTALL BANNER */
+  .install-banner { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: var(--radius); padding: 12px 14px; margin: 12px 16px; display: none; align-items: center; gap: 10px; }
+  .install-banner.show { display: flex; }
+  .install-banner-text { font-size: 12px; color: var(--gold); flex: 1; line-height: 1.5; }
+  .install-btn { background: var(--gold); color: #000; border: none; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; font-weight: 700; white-space: nowrap; }
+
+  select.form-input option { background: #1e1e35; }
+</style>
+</head>
+<body>
+
+<!-- SETUP MODAL -->
+<div class="modal-bg" id="modal-setup">
+  <div class="modal" style="border-radius:20px;margin:20px;max-height:90vh;">
+    <div class="modal-handle"></div>
+    <div class="setup-logo">📚</div>
+    <div class="setup-title">مرحباً بك في مكتبتي</div>
+    <div class="setup-desc">لتفعيل المشاركة مع أصدقائك، تحتاج ربط قاعدة بيانات Supabase مجانية</div>
+    
+    <div class="setup-card">
+      <div class="setup-step">
+        <b style="color:var(--accent2);">الخطوة 1:</b> روح <a href="https://supabase.com" target="_blank">supabase.com</a> وأنشئ حساب مجاني<br><br>
+        <b style="color:var(--accent2);">الخطوة 2:</b> أنشئ Project جديد<br><br>
+        <b style="color:var(--accent2);">الخطوة 3:</b> روح Settings → API وانسخ:<br>
+        - <code>Project URL</code><br>
+        - <code>anon public key</code><br><br>
+        <b style="color:var(--accent2);">الخطوة 4:</b> روح SQL Editor وشغّل:
+        <pre style="background:var(--bg);padding:10px;border-radius:8px;font-size:11px;color:var(--gold);margin-top:8px;overflow-x:auto;white-space:pre-wrap;direction:ltr;text-align:left;">CREATE TABLE novels (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text, author text, genre text,
+  description text, emoji text,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE chapters (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  novel_id uuid REFERENCES novels(id) ON DELETE CASCADE,
+  title text, content text, language text,
+  translation text, translated boolean DEFAULT false,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE chapter_files (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  chapter_id uuid REFERENCES chapters(id) ON DELETE CASCADE,
+  name text, type text, url text, size bigint,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE novels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chapters ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chapter_files ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_all" ON novels FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_all" ON chapters FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_all" ON chapter_files FOR ALL USING (true) WITH CHECK (true);</pre>
+        <b style="color:var(--accent2);">الخطوة 5:</b> روح Storage، أنشئ bucket اسمه <code>files</code> وخليه Public
+      </div>
+    </div>
+
+    <span class="form-label">Project URL</span>
+    <input class="form-input" id="sb-url" placeholder="https://xxxx.supabase.co" type="url">
+    <span class="form-label">Anon Key</span>
+    <input class="form-input" id="sb-key" placeholder="eyJ...">
+    
+    <div class="btn-row">
+      <button class="btn" onclick="skipSetup()">تخطي (بدون مشاركة)</button>
+      <button class="btn btn-accent" onclick="saveSupabase()">حفظ واتصال ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD NOVEL MODAL -->
+<div class="modal-bg" id="modal-novel">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📖 إضافة رواية</div>
+    <span class="form-label">اسم الرواية *</span>
+    <input class="form-input" id="n-name" placeholder="مثال: موسم الهجرة إلى الشمال">
+    <span class="form-label">اسم المؤلف</span>
+    <input class="form-input" id="n-author" placeholder="مثال: الطيب صالح">
+    <span class="form-label">النوع الأدبي</span>
+    <select class="form-input" id="n-genre">
+      <option>رومانسي</option><option>خيال علمي</option><option>تاريخي</option>
+      <option>بوليسي</option><option>رعب</option><option>مغامرة</option>
+      <option>فلسفي</option><option>إثارة</option><option>درامي</option>
+    </select>
+    <span class="form-label">وصف مختصر</span>
+    <textarea class="form-input" id="n-desc" placeholder="اكتب وصفاً للرواية..."></textarea>
+    <div class="btn-row">
+      <button class="btn" onclick="closeModal('modal-novel')">إلغاء</button>
+      <button class="btn btn-accent" onclick="addNovel()">إضافة ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD CHAPTER MODAL -->
+<div class="modal-bg" id="modal-chapter">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✍️ إضافة شابتر</div>
+    <span class="form-label">عنوان الشابتر *</span>
+    <input class="form-input" id="c-title" placeholder="مثال: الفصل الأول - البداية">
+    <span class="form-label">نص الشابتر</span>
+    <textarea class="form-input" id="c-text" style="min-height:120px;" placeholder="الصق نص الشابتر هنا..."></textarea>
+    <span class="form-label">لغة النص الأصلي</span>
+    <select class="form-input" id="c-lang">
+      <option>English</option><option>Arabic</option><option>Japanese</option>
+      <option>Korean</option><option>Chinese</option><option>French</option>
+      <option>Spanish</option><option>Turkish</option>
+    </select>
+    <span class="form-label">رفع ملفات (PDF أو Word)</span>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div style="font-size:28px;">📁</div>
+      <div class="upload-zone-text">اضغط لرفع ملفات PDF أو Word<br><small>يتطلب اتصال Supabase</small></div>
+    </div>
+    <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx" style="display:none" onchange="handleFiles(this.files)">
+    <div class="upload-preview" id="upload-preview"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="closeModal('modal-chapter')">إلغاء</button>
+      <button class="btn btn-accent" onclick="addChapter()">إضافة ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar" id="topbar">
+    <div class="topbar-title" id="topbar-title">📚 مكتبتي</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="sync-dot off" id="sync-dot" title="حالة الاتصال"></span>
+      <button class="icon-btn" onclick="openSetup()" title="الإعدادات">⚙️</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="main-tabs">
+    <button class="tab active" onclick="switchTab('library')" id="tab-library">
+      <span class="tab-icon">📚</span><span>المكتبة</span>
+    </button>
+    <button class="tab" onclick="switchTab('translate')" id="tab-translate">
+      <span class="tab-icon">🌐</span><span>ترجمة</span>
+    </button>
+    <button class="tab" onclick="switchTab('export')" id="tab-export">
+      <span class="tab-icon">💾</span><span>تصدير</span>
+    </button>
+  </div>
+
+  <!-- LIBRARY SCREEN -->
+  <div class="screen active" id="screen-library">
+    <div id="install-banner" class="install-banner">
+      <div class="install-banner-text">📲 ثبّت التطبيق على موبايلك</div>
+      <button class="install-btn" onclick="installPWA()">تثبيت</button>
+    </div>
+    <div id="share-banner" class="share-banner" style="display:none;">
+      <div class="share-banner-text">🔗 شارك هذا الرابط مع أصدقائك ليرون روايتك</div>
+      <button class="share-copy-btn" onclick="copyShareLink()">نسخ الرابط</button>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" type="text" placeholder="🔍 ابحث عن رواية..." oninput="filterNovels(this.value)">
+    </div>
+    <div class="novels-grid" id="novels-list">
+      <div class="empty"><div class="empty-icon">📭</div><div class="empty-text">لا توجد روايات بعد<br>اضغط + لإضافة أولى روايتك</div></div>
+    </div>
+  </div>
+
+  <!-- TRANSLATE SCREEN -->
+  <div class="screen" id="screen-translate">
+    <div class="trans-screen">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7;">ترجم شابترات روايتك بالذكاء الاصطناعي إلى أي لغة</p>
+      <span class="form-label">اختر الرواية</span>
+      <select class="form-input" id="t-novel" onchange="loadChaptersForTrans()">
+        <option value="">-- اختر رواية --</option>
+      </select>
+      <span class="form-label">اختر الشابتر</span>
+      <select class="form-input" id="t-chapter"><option value="">-- اختر شابتر --</option></select>
+      <span class="form-label">الترجمة إلى</span>
+      <select class="form-input" id="t-lang">
+        <option value="Arabic">العربية 🇸🇦</option>
+        <option value="English">الإنجليزية 🇺🇸</option>
+        <option value="French">الفرنسية 🇫🇷</option>
+        <option value="Turkish">التركية 🇹🇷</option>
+        <option value="Persian">الفارسية 🇮🇷</option>
+        <option value="Spanish">الإسبانية 🇪🇸</option>
+        <option value="German">الألمانية 🇩🇪</option>
+      </select>
+      <button class="btn btn-accent" style="width:100%;margin-top:16px;" onclick="runTranslation()">🌐 ترجم الآن</button>
+      <div id="t-result" style="margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- EXPORT SCREEN -->
+  <div class="screen" id="screen-export">
+    <div class="trans-screen">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7;">صدّر روايتك كاملةً أو شابترات محددة</p>
+      <span class="form-label">اختر الرواية</span>
+      <select class="form-input" id="e-novel" onchange="loadChaptersForExport()">
+        <option value="">-- اختر رواية --</option>
+      </select>
+      <span class="form-label">الشابترات</span>
+      <div id="e-chapters" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;"></div>
+      <span class="form-label" style="margin-top:14px;">صيغة التصدير</span>
+      <div class="export-grid">
+        <div class="export-card" onclick="doExport('pdf')">
+          <div class="export-icon">📕</div>
+          <div class="export-name">PDF</div>
+          <div class="export-desc">للقراءة والطباعة</div>
+        </div>
+        <div class="export-card" onclick="doExport('word')">
+          <div class="export-icon">📘</div>
+          <div class="export-name">Word</div>
+          <div class="export-desc">للتعديل والنشر</div>
+        </div>
+        <div class="export-card" onclick="doExport('txt')">
+          <div class="export-icon">📄</div>
+          <div class="export-name">نص عادي</div>
+          <div class="export-desc">خفيف وسريع</div>
+        </div>
+        <div class="export-card" onclick="doExport('html')">
+          <div class="export-icon">🌐</div>
+          <div class="export-name">HTML</div>
+          <div class="export-desc">للنشر الإلكتروني</div>
+        </div>
+      </div>
+      <div id="e-status" style="margin-top:12px;text-align:center;font-size:13px;color:var(--muted);"></div>
+    </div>
+  </div>
+
+  <!-- NOVEL DETAIL SCREEN -->
+  <div class="screen" id="screen-novel"></div>
+
+  <!-- READER SCREEN -->
+  <div class="screen" id="screen-reader"></div>
+
+  <button class="fab" id="fab" onclick="fabAction()">＋</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let supabase = null;
+let novels = [];
+let pendingFiles = [];
+let currentNovelId = null;
+let currentChapterId = null;
+let currentScreen = 'library';
+let deferredInstall = null;
+let isOnline = false;
+
+const EMOJIS = ['📕','📗','📘','📙','📓','📒','📔','📃'];
+
+// ─── INIT ─────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  const url = localStorage.getItem('sb_url');
+  const key = localStorage.getItem('sb_key');
+  if (url && key) {
+    await connectSupabase(url, key);
+  } else if (!localStorage.getItem('setup_skipped')) {
+    openModal('modal-setup');
+  }
+  await loadNovels();
+  setupPWA();
+});
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstall = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+async function installPWA() {
+  if (deferredInstall) {
+    deferredInstall.prompt();
+    const result = await deferredInstall.userChoice;
+    if (result.outcome === 'accepted') {
+      document.getElementById('install-banner').classList.remove('show');
+    }
+  } else {
+    toast('📱 افتح المتصفح واضغط "إضافة إلى الشاشة الرئيسية"');
+  }
+}
+
+function setupPWA() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+// ─── SUPABASE ─────────────────────────────────────────────
+async function connectSupabase(url, key) {
+  try {
+    const dot = document.getElementById('sync-dot');
+    dot.className = 'sync-dot loading';
+    supabase = window.supabase.createClient(url, key);
+    const { error } = await supabase.from('novels').select('id').limit(1);
+    if (error) throw error;
+    isOnline = true;
+    dot.className = 'sync-dot on';
+    document.getElementById('share-banner').style.display = 'flex';
+    toast('✅ متصل بقاعدة البيانات');
+  } catch (e) {
+    isOnline = false;
+    document.getElementById('sync-dot').className = 'sync-dot off';
+    toast('⚠️ فشل الاتصال — يعمل محلياً');
+    supabase = null;
+  }
+}
+
+function saveSupabase() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('⚠️ أدخل URL والـ Key'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  closeModal('modal-setup');
+  connectSupabase(url, key).then(() => loadNovels());
+}
+
+function skipSetup() {
+  localStorage.setItem('setup_skipped', '1');
+  closeModal('modal-setup');
+  toast('📱 يعمل محلياً — يمكن الربط لاحقاً من الإعدادات');
+}
+
+function openSetup() {
+  const url = localStorage.getItem('sb_url') || '';
+  const key = localStorage.getItem('sb_key') || '';
+  document.getElementById('sb-url').value = url;
+  document.getElementById('sb-key').value = key;
+  openModal('modal-setup');
+}
+
+// ─── NOVELS CRUD ──────────────────────────────────────────
+async function loadNovels() {
+  if (supabase) {
+    const { data } = await supabase.from('novels').select('*').order('created_at', { ascending: false });
+    if (data) { novels = data; saveLocal(); }
+  } else {
+    novels = JSON.parse(localStorage.getItem('novels') || '[]');
+  }
+  renderNovels();
+  refreshSelects();
+}
+
+function saveLocal() {
+  localStorage.setItem('novels', JSON.stringify(novels));
+}
+
+async function addNovel() {
+  const name = document.getElementById('n-name').value.trim();
+  if (!name) { toast('⚠️ أدخل اسم الرواية'); return; }
+  const novel = {
+    name,
+    author: document.getElementById('n-author').value.trim() || 'غير محدد',
+    genre: document.getElementById('n-genre').value,
+    description: document.getElementById('n-desc').value.trim(),
+    emoji: EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    chapters: []
+  };
+  if (supabase) {
+    const { data, error } = await supabase.from('novels').insert([novel]).select().single();
+    if (error) { toast('❌ خطأ: ' + error.message); return; }
+    novel.id = data.id;
+    novel.created_at = data.created_at;
+  } else {
+    novel.id = 'local_' + Date.now();
+    novel.created_at = new Date().toISOString();
+  }
+  novels.unshift(novel);
+  saveLocal();
+  closeModal('modal-novel');
+  clearForm(['n-name','n-author','n-desc']);
+  renderNovels();
+  refreshSelects();
+  toast('✅ تمت إضافة الرواية');
+}
+
+// ─── CHAPTERS CRUD ────────────────────────────────────────
+async function loadChapters(novelId) {
+  const novel = novels.find(n => n.id === novelId);
+  if (!novel) return [];
+  if (supabase && !novelId.toString().startsWith('local_')) {
+    const { data } = await supabase.from('chapters')
+      .select('*, chapter_files(*)')
+      .eq('novel_id', novelId)
+      .order('sort_order', { ascending: true });
+    if (data) {
+      novel.chapters = data;
+      saveLocal();
+    }
+  }
+  return novel.chapters || [];
+}
+
+async function addChapter() {
+  const title = document.getElementById('c-title').value.trim();
+  const content = document.getElementById('c-text').value.trim();
+  if (!title) { toast('⚠️ أدخل عنوان الشابتر'); return; }
+  const novel = novels.find(n => n.id === currentNovelId);
+  if (!novel) return;
+  const ch = {
+    novel_id: currentNovelId,
+    title,
+    content,
+    language: document.getElementById('c-lang').value,
+    translated: false,
+    translation: '',
+    sort_order: (novel.chapters || []).length,
+    chapter_files: []
+  };
+  if (supabase && !currentNovelId.toString().startsWith('local_')) {
+    const { data, error } = await supabase.from('chapters').insert([{
+      novel_id: ch.novel_id, title: ch.title, content: ch.content,
+      language: ch.language, translated: false, translation: '',
+      sort_order: ch.sort_order
+    }]).select().single();
+    if (error) { toast('❌ خطأ: ' + error.message); return; }
+    ch.id = data.id;
+    ch.created_at = data.created_at;
+    // Upload files
+    for (const f of pendingFiles) {
+      await uploadFile(f, ch.id);
+    }
+    const { data: files } = await supabase.from('chapter_files').select('*').eq('chapter_id', ch.id);
+    ch.chapter_files = files || [];
+  } else {
+    ch.id = 'local_' + Date.now();
+    ch.created_at = new Date().toISOString();
+    ch.chapter_files = pendingFiles.map((f,i) => ({ id: 'lf_'+i, name: f.name, type: f.type, url: '', size: f.size }));
+  }
+  if (!novel.chapters) novel.chapters = [];
+  novel.chapters.push(ch);
+  saveLocal();
+  closeModal('modal-chapter');
+  clearForm(['c-title','c-text']);
+  pendingFiles = [];
+  document.getElementById('upload-preview').innerHTML = '';
+  openNovel(currentNovelId);
+  toast('✅ تمت إضافة الشابتر');
+}
+
+async function uploadFile(file, chapterId) {
+  if (!supabase) return null;
+  const path = `${chapterId}/${Date.now()}_${file.name}`;
+  const { data: up, error: upErr } = await supabase.storage.from('files').upload(path, file, { upsert: true });
+  if (upErr) { toast('⚠️ فشل رفع: ' + file.name); return null; }
+  const { data: pub } = supabase.storage.from('files').getPublicUrl(path);
+  const { data } = await supabase.from('chapter_files').insert([{
+    chapter_id: chapterId,
+    name: file.name,
+    type: file.name.endsWith('.pdf') ? 'pdf' : 'word',
+    url: pub.publicUrl,
+    size: file.size
+  }]).select().single();
+  return data;
+}
+
+// ─── RENDERING ────────────────────────────────────────────
+function renderNovels(filter = '') {
+  const list = document.getElementById('novels-list');
+  const filtered = novels.filter(n => 
+    n.name.includes(filter) || (n.author||'').includes(filter)
+  );
+  if (!filtered.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-text">لا توجد روايات${filter ? ' تطابق البحث' : '<br>اضغط + لإضافة أولى روايتك'}</div></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(n => `
+    <div class="novel-card" onclick="openNovel('${n.id}')">
+      <div class="novel-cover">${n.emoji || '📕'}</div>
+      <div class="novel-info">
+        <div class="novel-name">${n.name}</div>
+        <div class="novel-author">✍️ ${n.author}</div>
+        <div class="novel-stats">
+          <span class="badge accent">${n.genre}</span>
+          <span class="badge">${(n.chapters||[]).length} شابتر</span>
+          <span class="badge">${n.id.toString().startsWith('local_') ? '📴 محلي' : '☁️ مشترك'}</span>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:18px;">‹</span>
+    </div>`).join('');
+}
+
+async function openNovel(id) {
+  currentNovelId = id;
+  const novel = novels.find(n => n.id === id);
+  const chapters = await loadChapters(id);
+  const s = document.getElementById('screen-novel');
+  s.innerHTML = `
+    <div class="novel-header">
+      <button class="topbar-back" onclick="backTo('library')" style="margin-bottom:8px;">‹ العودة</button>
+      <div class="novel-header-title">${novel.emoji} ${novel.name}</div>
+      <div class="novel-header-sub">✍️ ${novel.author} · ${novel.genre}</div>
+      ${novel.description ? `<div class="novel-header-desc">${novel.description}</div>` : ''}
+      <div class="action-row">
+        <button class="action-btn" onclick="openModal('modal-chapter')">➕ شابتر</button>
+        <button class="action-btn" onclick="goExport('${id}')">💾 تصدير</button>
+        <button class="action-btn" onclick="goTranslate('${id}')">🌐 ترجمة</button>
+        ${isOnline ? `<button class="action-btn" onclick="copyShareLink()">🔗 مشاركة</button>` : ''}
+      </div>
+    </div>
+    <div id="ch-list">
+      ${chapters.length ? chapters.map((c,i) => `
+        <div class="chapter-item" onclick="openReader('${id}','${c.id}')">
+          <div class="ch-num ${c.translated ? 'ch-translated' : ''}">${i+1}</div>
+          <div class="ch-info">
+            <div class="ch-title">${c.title}</div>
+            <div class="ch-meta">${c.language} · ${(c.content||'').length} حرف ${c.translated ? '· ✓ مترجم' : ''}</div>
+            ${(c.chapter_files||[]).length ? `<div class="ch-files">
+              ${c.chapter_files.map(f => `<span class="file-badge ${f.type}">${f.type === 'pdf' ? '📕' : '📘'} ${f.name}</span>`).join('')}
+            </div>` : ''}
+          </div>
+          <span style="color:var(--muted);">‹</span>
+        </div>`).join('') : 
+        `<div class="empty"><div class="empty-icon">📝</div><div class="empty-text">لا توجد شابترات<br>اضغط "شابتر" لإضافة أول فصل</div></div>`}
+    </div>`;
+  showScreen('novel');
+  document.getElementById('topbar-title').textContent = novel.name;
+  document.getElementById('fab').style.display = 'flex';
+}
+
+function openReader(novelId, chapterId) {
+  currentNovelId = novelId;
+  currentChapterId = chapterId;
+  const novel = novels.find(n => n.id === novelId);
+  const ch = (novel.chapters||[]).find(c => c.id === chapterId || c.id == chapterId);
+  if (!ch) return;
+  const isRTL = ['Arabic','Persian'].includes(ch.language);
+  const s = document.getElementById('screen-reader');
+  s.innerHTML = `
+    <div class="novel-header" style="padding-bottom:10px;">
+      <button class="topbar-back" onclick="openNovel('${novelId}')" style="margin-bottom:6px;">‹ ${novel.name}</button>
+      <div class="novel-header-title" style="font-size:16px;">${ch.title}</div>
+    </div>
+    <div class="reader-body">
+      <div class="reader-text" dir="${isRTL?'rtl':'ltr'}">${(ch.content||'(لا يوجد نص)').replace(/\n/g,'<br>')}</div>
+      ${ch.translated && ch.translation ? `
+        <div class="trans-box">
+          <div class="trans-label">🌐 الترجمة</div>
+          <div class="trans-text" dir="rtl">${ch.translation.replace(/\n/g,'<br>')}</div>
+        </div>` : ''}
+      ${(ch.chapter_files||[]).length ? `
+        <div class="files-box">
+          <div class="files-box-title">📁 الملفات المرفوعة</div>
+          ${ch.chapter_files.map(f => `
+            <div class="file-item">
+              <span class="file-icon">${f.type==='pdf'?'📕':'📘'}</span>
+              <span class="file-name">${f.name}</span>
+              ${f.url ? `<a href="${f.url}" target="_blank" class="file-dl">تحميل</a>` : '<span style="font-size:11px;color:var(--muted);">محلي</span>'}
+            </div>`).join('')}
+        </div>` : ''}
+      <div id="r-trans-result"></div>
+    </div>
+    <div class="reader-controls">
+      ${!ch.translated ? `<button class="btn btn-accent" style="flex:1;" onclick="translateReader()">🌐 ترجم هذا الشابتر</button>` : ''}
+      <button class="btn" onclick="openModal('modal-chapter')" style="flex:1;">✏️ تعديل</button>
+    </div>`;
+  showScreen('reader');
+  document.getElementById('topbar-title').textContent = ch.title;
+  document.getElementById('fab').style.display = 'none';
+}
+
+// ─── TRANSLATE ────────────────────────────────────────────
+async function translateReader() {
+  const novel = novels.find(n => n.id === currentNovelId);
+  const ch = (novel.chapters||[]).find(c => c.id === currentChapterId || c.id == currentChapterId);
+  const res = document.getElementById('r-trans-result');
+  res.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);"><div class="spinner"></div><br><br>جاري الترجمة...</div>`;
+  const translation = await callAI(`ترجم النص التالي إلى العربية ترجمة أدبية جميلة مع الحفاظ على أسلوب الرواية:\n\n${(ch.content||'').substring(0,1200)}`);
+  if (translation) {
+    ch.translated = true;
+    ch.translation = translation;
+    if (supabase && !ch.id.toString().startsWith('local_')) {
+      await supabase.from('chapters').update({ translated: true, translation }).eq('id', ch.id);
+    }
+    saveLocal();
+    res.innerHTML = `<div class="trans-box"><div class="trans-label">✅ تمت الترجمة</div><div class="trans-text" dir="rtl">${translation.replace(/\n/g,'<br>')}</div></div>`;
+  } else {
+    res.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">❌ فشلت الترجمة. تحقق من الاتصال.</div>`;
+  }
+}
+
+async function runTranslation() {
+  const novelId = document.getElementById('t-novel').value;
+  const chapId = document.getElementById('t-chapter').value;
+  const lang = document.getElementById('t-lang').value;
+  if (!novelId || !chapId) { toast('⚠️ اختر الرواية والشابتر'); return; }
+  const novel = novels.find(n => n.id === novelId);
+  const ch = (novel.chapters||[]).find(c => c.id === chapId || c.id == chapId);
+  const res = document.getElementById('t-result');
+  res.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);"><div class="spinner"></div><br><br>جاري الترجمة...</div>`;
+  const translation = await callAI(`Translate this text to ${lang} in a beautiful literary style:\n\n${(ch.content||'').substring(0,1200)}`);
+  if (translation) {
+    ch.translated = true;
+    ch.translation = translation;
+    if (supabase && !ch.id.toString().startsWith('local_')) {
+      await supabase.from('chapters').update({ translated: true, translation }).eq('id', ch.id);
+    }
+    saveLocal();
+    res.innerHTML = `<div class="trans-box"><div class="trans-label">✅ تمت الترجمة إلى ${lang}</div><div class="trans-text" dir="${lang==='Arabic'||lang==='Persian'?'rtl':'ltr'}">${translation.replace(/\n/g,'<br>')}</div></div>`;
+  } else {
+    res.innerHTML = `<div style="color:var(--red);padding:12px;font-size:13px;">❌ فشلت الترجمة.</div>`;
+  }
+}
+
+async function callAI(prompt) {
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    return data.content?.[0]?.text || null;
+  } catch { return null; }
+}
+
+// ─── EXPORT ───────────────────────────────────────────────
+function loadChaptersForExport() {
+  const id = document.getElementById('e-novel').value;
+  const d = document.getElementById('e-chapters');
+  d.innerHTML = '';
+  if (!id) return;
+  const n = novels.find(x => x.id === id);
+  const chs = n.chapters || [];
+  if (!chs.length) { d.innerHTML = '<p style="font-size:13px;color:var(--muted);">لا توجد شابترات</p>'; return; }
+  d.innerHTML = chs.map((c,i) => `
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--card);padding:8px 10px;border-radius:8px;border:1px solid var(--border);">
+      <input type="checkbox" value="${c.id}" checked style="width:auto;accent-color:var(--accent);">
+      <span style="font-size:13px;">${i+1}. ${c.title}</span>
+      ${c.translated ? '<span style="font-size:10px;color:var(--green);">✓ مترجم</span>' : ''}
+    </label>`).join('');
+}
+
+function getSelectedChapters(novelId) {
+  const n = novels.find(x => x.id === novelId);
+  const boxes = document.querySelectorAll('#e-chapters input[type=checkbox]');
+  if (!boxes.length) return n.chapters || [];
+  const ids = [...boxes].filter(b => b.checked).map(b => b.value);
+  return (n.chapters||[]).filter(c => ids.includes(String(c.id)));
+}
+
+function doExport(type) {
+  const id = document.getElementById('e-novel').value;
+  if (!id) { toast('⚠️ اختر رواية'); return; }
+  const n = novels.find(x => x.id === id);
+  const chapters = getSelectedChapters(id);
+  if (!chapters.length) { toast('⚠️ اختر شابتراً واحداً على الأقل'); return; }
+  const st = document.getElementById('e-status');
+  st.innerHTML = '<div class="spinner"></div> جاري التصدير...';
+  setTimeout(() => {
+    try {
+      if (type === 'pdf') exportPDF(n, chapters);
+      else if (type === 'word') exportWord(n, chapters);
+      else if (type === 'txt') exportTxt(n, chapters);
+      else exportHTML(n, chapters);
+      st.innerHTML = '✅ تم التصدير بنجاح!';
+      setTimeout(() => st.innerHTML = '', 3000);
+    } catch(e) { st.innerHTML = '❌ فشل: ' + e.message; }
+  }, 200);
+}
+
+function exportPDF(n, chapters) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  doc.setFont('helvetica');
+  doc.setFontSize(22); doc.text(n.name, 105, 28, { align: 'center' });
+  doc.setFontSize(13); doc.text(n.author, 105, 38, { align: 'center' });
+  let y = 55;
+  chapters.forEach((c, i) => {
+    if (i > 0) { doc.addPage(); y = 20; }
+    doc.setFontSize(15); doc.text(c.title, 15, y); y += 10;
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(c.content||'', 180);
+    lines.forEach(l => { if (y > 272) { doc.addPage(); y = 20; } doc.text(l, 15, y); y += 6; });
+    if (c.translated && c.translation) {
+      y += 8;
+      doc.setFontSize(13); doc.text('--- الترجمة ---', 105, y, { align: 'center' }); y += 8;
+      doc.setFontSize(11);
+      const tl = doc.splitTextToSize(c.translation, 180);
+      tl.forEach(l => { if (y > 272) { doc.addPage(); y = 20; } doc.text(l, 15, y); y += 6; });
+    }
+  });
+  doc.save(`${n.name}.pdf`);
+}
+
+function exportWord(n, chapters) {
+  let html = `<html><head><meta charset="utf-8"><style>body{font-family:Georgia,serif;margin:50px;direction:rtl;max-width:800px;}h1{text-align:center;font-size:26px;margin-bottom:6px;}h2{font-size:18px;color:#333;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:40px;}p{line-height:2;margin-bottom:10px;}.trans{background:#f0f4ff;padding:18px;border-radius:8px;margin-top:20px;border:1px solid #c0d0ff;}</style></head><body>
+  <h1>${n.name}</h1><p style="text-align:center;color:#666;">${n.author}</p>`;
+  chapters.forEach(c => {
+    html += `<h2>${c.title}</h2><p>${(c.content||'').replace(/\n/g,'</p><p>')}</p>`;
+    if (c.translated && c.translation) html += `<div class="trans"><b>الترجمة:</b><br><br>${c.translation.replace(/\n/g,'<br>')}</div>`;
+  });
+  html += '</body></html>';
+  const blob = new Blob(['\ufeff'+html], { type: 'application/msword' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${n.name}.doc`; a.click();
+}
+
+function exportTxt(n, chapters) {
+  let txt = `${n.name}\n${n.author}\n${'═'.repeat(50)}\n\n`;
+  chapters.forEach((c,i) => {
+    txt += `الفصل ${i+1}: ${c.title}\n${'─'.repeat(40)}\n${c.content||''}\n`;
+    if (c.translated && c.translation) txt += `\n[الترجمة]\n${c.translation}\n`;
+    txt += '\n\n';
+  });
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${n.name}.txt`; a.click();
+}
+
+function exportHTML(n, chapters) {
+  let html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${n.name}</title>
+  <style>*{box-sizing:border-box}body{font-family:Georgia,serif;background:#fdfcf8;color:#222;max-width:800px;margin:0 auto;padding:40px 20px;}h1{text-align:center;font-size:2em;color:#2c1a4e;}h2{font-size:1.3em;color:#4a3470;border-right:4px solid #7c6af7;padding-right:12px;margin-top:48px;}p{line-height:2;margin-bottom:12px;font-size:16px;}.trans{background:#f0eeff;border:1px solid #ccc0ff;border-radius:10px;padding:20px;margin-top:24px;}footer{text-align:center;color:#aaa;margin-top:60px;font-size:12px;}</style>
+  </head><body><h1>${n.emoji||'📚'} ${n.name}</h1><p style="text-align:center;color:#888;">✍️ ${n.author}</p>`;
+  chapters.forEach((c,i) => {
+    html += `<h2>${i+1}. ${c.title}</h2><p>${(c.content||'').replace(/\n/g,'</p><p>')}</p>`;
+    if (c.translated && c.translation) html += `<div class="trans"><strong>🌐 الترجمة:</strong><br><br>${c.translation.replace(/\n/g,'<br>')}</div>`;
+  });
+  html += `<footer>تم التصدير من تطبيق مكتبتي</footer></body></html>`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${n.name}.html`; a.click();
+}
+
+// ─── FILE HANDLING ────────────────────────────────────────
+function handleFiles(files) {
+  pendingFiles = [...files];
+  const prev = document.getElementById('upload-preview');
+  prev.innerHTML = pendingFiles.map((f,i) => `
+    <div class="upload-file-item">
+      <span>${f.name.endsWith('.pdf') ? '📕' : '📘'}</span>
+      <span style="flex:1;font-size:12px;">${f.name}</span>
+      <span style="font-size:11px;color:var(--muted);">${(f.size/1024).toFixed(0)} KB</span>
+      <button class="upload-remove" onclick="removeFile(${i})">✕</button>
+    </div>`).join('');
+}
+
+function removeFile(i) {
+  pendingFiles.splice(i, 1);
+  handleFiles(pendingFiles.reduce((a,f) => { a.push(f); return a; }, []));
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + tab).classList.add('active');
+  currentScreen = tab;
+  document.getElementById('topbar-title').textContent = { library: '📚 مكتبتي', translate: '🌐 الترجمة', export: '💾 التصدير' }[tab];
+  document.getElementById('fab').style.display = tab === 'library' ? 'flex' : 'none';
+  if (tab === 'translate' || tab === 'export') refreshSelects();
+}
+
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('main-tabs').style.display = ['library','translate','export'].includes(name) ? 'flex' : 'none';
+}
+
+function backTo(where) {
+  if (where === 'library') {
+    currentNovelId = null;
+    showScreen('library');
+    document.getElementById('main-tabs').style.display = 'flex';
+    document.getElementById('topbar-title').textContent = '📚 مكتبتي';
+    document.getElementById('fab').style.display = 'flex';
+  }
+}
+
+function fabAction() {
+  if (currentScreen === 'library' || !currentNovelId) openModal('modal-novel');
+  else openModal('modal-chapter');
+}
+
+function goExport(id) {
+  switchTab('export');
+  setTimeout(() => { document.getElementById('e-novel').value = id; loadChaptersForExport(); }, 100);
+}
+
+function goTranslate(id) {
+  switchTab('translate');
+  setTimeout(() => { document.getElementById('t-novel').value = id; loadChaptersForTrans(); }, 100);
+}
+
+function loadChaptersForTrans() {
+  const id = document.getElementById('t-novel').value;
+  const s = document.getElementById('t-chapter');
+  s.innerHTML = '<option value="">-- اختر شابتر --</option>';
+  if (!id) return;
+  const n = novels.find(x => x.id === id);
+  (n.chapters||[]).forEach(c => { s.innerHTML += `<option value="${c.id}">${c.title}</option>`; });
+}
+
+function refreshSelects() {
+  ['t-novel','e-novel'].forEach(id => {
+    const s = document.getElementById(id);
+    if (!s) return;
+    s.innerHTML = '<option value="">-- اختر رواية --</option>' + novels.map(n => `<option value="${n.id}">${n.emoji||'📚'} ${n.name}</option>`).join('');
+  });
+}
+
+function filterNovels(v) { renderNovels(v); }
+
+// ─── SHARE ────────────────────────────────────────────────
+function copyShareLink() {
+  const link = window.location.href.split('?')[0];
+  navigator.clipboard.writeText(link).then(() => toast('✅ تم نسخ الرابط! شاركه مع صديقك')).catch(() => toast('الرابط: ' + link));
+}
+
+// ─── UTILS ────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function clearForm(ids) { ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; }); }
+function toast(msg, dur = 2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+</script>
+</body>
+</html>
